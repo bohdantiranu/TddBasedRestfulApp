@@ -56,7 +56,7 @@ namespace TddBasedRestfulApp.Controllers
         [HttpPost]
         public async Task<ActionResult> AddGroupAsync(GroupDto group)
         {
-            if (!ModelState.IsValid)
+            if (!ModelState.IsValid || group is null)
                 return BadRequest(ModelState);
 
             await _groupService.AddAsync(group);

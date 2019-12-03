@@ -1,8 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Core.Dto;
 using Core.Interfaces;
-using Core.Models;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
 using TddBasedRestfulApp.Controllers;
@@ -12,73 +13,66 @@ namespace AppTests
 {
     public class GroupsControllerTests
     {
+        private readonly IGroupService _groupServiceMock;
+        private readonly GroupsController _sut;
+        private readonly List<GroupDto> _expectedList;
+
+        public GroupsControllerTests()
+        {
+            _groupServiceMock = Substitute.For<IGroupService>();
+            var expected = GroupDto.GetGroupDtoWithId(1, "someName", "someCountry", 2000);
+            _expectedList = new List<GroupDto> { expected };
+            ConfigureSub();
+
+            _sut = new GroupsController(_groupServiceMock);
+        }
+
+
         [Fact]
         public async Task GetAllGroupsAsync_ShouldReturnStatusOkAndListOfGroups()
         {
-            //Arrange
-            var groupRepoMock = Substitute.For<IGroupRepository>();
-            groupRepoMock.GetAllAsync().Returns(new List<Group>
-            {
-                new Group {Id = 1, Name = "someName", Country = "someCountry", CreationYear = 2000}
-            });
-            var groupServiceMock = Substitute.For<IGroupService>();
-            var expected = new List<GroupDto> {GroupDto.GetGroupDtoWithId(1, "someName", "someCountry", 2000)};
-            groupServiceMock.GetAllAsync().Returns(expected);
-            var sut = new GroupsController(groupServiceMock);
-
             //Act
-            var response = await sut.GetAllGroupsAsync();
+            var response = await _sut.GetAllGroupsAsync();
             //Assert
-            await groupServiceMock.Received().GetAllAsync();
-            //Assert.Equal(200, ((StatusCodeResult)response).StatusCode)); //need to fix(can`t get statusCode & value from ActionResult) but result is correct
-            //Assert.Equal(expected, response.Value);
+            //await groupServiceMock.Received().GetAllAsync();
+            var responseResult = (ObjectResult)response.Result;
+
+            Assert.Equal(200, responseResult.StatusCode);
+            Assert.Equal(_expectedList, responseResult.Value);
+            Assert.Equal(_expectedList.First(), ((List<GroupDto>)responseResult.Value).First());
         }
 
         [Fact]
         public async Task AddGroupAsync_ShouldReturnStatusOk()
         {
-            var groupRepoMock = Substitute.For<IGroupRepository>();
-            var groupServiceMock = Substitute.For<IGroupService>();
-            var groupToAdd = new Group {Name = "someName", Country = "someCountry", CreationYear = 2000};
             var groupDtoToAdd = GroupDto.GetGroupDtoWithoutId("someName", "someCountry", 2000);
-            var sut = new GroupsController(groupServiceMock);
-
             //Act
-            var response = await sut.AddGroupAsync(groupDtoToAdd);
+            var response = await _sut.AddGroupAsync(groupDtoToAdd);
 
             //Assert
-            await groupServiceMock.Received().AddAsync(groupDtoToAdd);
-            //Assert.Equal(200, ((StatusCodeResult) response).StatusCode);
+            //await groupServiceMock.Received().AddAsync(groupDtoToAdd);
+            Assert.Equal(200, ((StatusCodeResult) response).StatusCode);
         }
 
         [Fact]
         public async Task AddGroupAsync_NullPassedShouldReturnStatusBadRequest()
         {
-            //Arrange
-            var groupServiceMock = Substitute.For<IGroupService>();
-            var sut = new GroupsController(groupServiceMock);
-
             //Act
-            var response = await sut.AddGroupAsync(null);
+            var response = await _sut.AddGroupAsync(null);
 
             //Assert
-            //Assert.Equal(400, ((StatusCodeResult) response).StatusCode);
+            Assert.Equal(400, ((BadRequestObjectResult) response).StatusCode);
         }
 
         [Fact]
         public async Task DeleteGroupAsync_ShouldReturnStatusOk()
         {
-            //Arrange
-            var groupServiceMock = Substitute.For<IGroupService>();
-            var groupToRemove = new Group {Id = 1, Name = "someName", Country = "someCountry", CreationYear = 2000};
-            var sut = new GroupsController(groupServiceMock);
-
             //Act
-            var response = await sut.DeleteGroupAsync(1);
+            var response = await _sut.DeleteGroupAsync(1);
 
             //Assert
-            await groupServiceMock.Received().DeleteByIdAsync(1);
-            //Assert.Equal(200, ((StatusCodeResult) response).StatusCode);
+            //await groupServiceMock.Received().DeleteByIdAsync(1);
+            Assert.Equal(200, ((StatusCodeResult) response).StatusCode);
         }
 
         [Theory]
@@ -86,12 +80,8 @@ namespace AppTests
         [InlineData(0)]
         public async Task DeleteGroupAsync_WrongIdShouldReturnStatusBadRequest(int id)
         {
-            //Arrange
-            var groupServiceMock = Substitute.For<IGroupService>();
-            var sut = new GroupsController(groupServiceMock);
-
             //Act
-            var response = await sut.DeleteGroupAsync(id);
+            var response = await _sut.DeleteGroupAsync(id);
 
             //Assert
             Assert.Equal(400, ((StatusCodeResult) response).StatusCode);
@@ -100,33 +90,21 @@ namespace AppTests
         [Fact]
         public async Task DeleteGroupAsync_NotExistingIdShouldReturnStatusNotFound()
         {
-            //Arrange
-            var groupServiceMock = Substitute.For<IGroupService>();
-            var sut = new GroupsController(groupServiceMock);
-
             //Act
-            var response = await sut.DeleteGroupAsync(100500);
-
+            await Assert.ThrowsAsync<Exception>(() => _sut.DeleteGroupAsync(100500));
             //Assert
-            await groupServiceMock.Received().DeleteByIdAsync(100500);
-            //Assert.Equal(404, ((StatusCodeResult) response).StatusCode);
+            await _groupServiceMock.Received().DeleteByIdAsync(100500);
         }
 
         [Fact]
         public async Task GetGroupByName_ShouldReturnStatusOkAndGroupDto()
         {
-            //Arrange
-            var groupServiceMock = Substitute.For<IGroupService>();
-            var expected = GroupDto.GetGroupDtoWithId(1, "someName", "someCountry", 2000);
-            groupServiceMock.GetAllAsync().Returns(new List<GroupDto> {expected});
-            var sut = new GroupsController(groupServiceMock);
-
             //Act
-            var response = await sut.GetGroupByName("someName");
+            var response = await _sut.GetGroupByName("someName");
 
             //Assert
-            await groupServiceMock.Received().FindOneAsync(g => g.Name == "someName");
-            //Assert.Equal(200, ((StatusCodeResult) response.Result).StatusCode);
+            //await groupServiceMock.Received().FindOneAsync(g => g.Name == "someName");
+            Assert.Equal(200, ((ObjectResult) response.Result).StatusCode);
             //Assert.Equal(expected, response.Value);
         }
 
@@ -149,38 +127,23 @@ namespace AppTests
         [Fact]
         public async Task GetGroupByName_NotExistingNameNameStatusBadRequest()
         {
-            //Arrange
-            var groupServiceMock = Substitute.For<IGroupService>();
-            var expected = GroupDto.GetGroupDtoWithId(1, "someName", "someCountry", 2000);
-            groupServiceMock.GetAllAsync().Returns(new List<GroupDto> {expected});
-            //groupServiceMock.FindOneAsync(g => g.Name == "notExistingName").Returns();
-            var sut = new GroupsController(groupServiceMock);
-
             //Act
-            var response = await sut.GetGroupByName("notExistingName");
+            var response = await _sut.GetGroupByName("notExistingName");
 
             //Assert
-            await groupServiceMock.Received().FindOneAsync(g => g.Name == "notExistingName");
-            //Assert.Equal(400, ((StatusCodeResult) response.Result).StatusCode);
+            //await groupServiceMock.Received().FindOneAsync(g => g.Name == "notExistingName");
+            Assert.Equal(404, ((ObjectResult) response.Result).StatusCode);
         }
 
         [Fact]
         public async Task GetGroupsByCountry_ShouldReturnStatusOkAndIEnumerableOfGroupDto()
         {
-            //Arrange
-            var groupServiceMock = Substitute.For<IGroupService>();
-            var group = new Group {Id = 1, Name = "someName", Country = "someCountry", CreationYear = 2000};
-            var expected = new List<GroupDto> {GroupDto.GetGroupDtoWithId(1, "someName", "someCountry", 2000)};
-            groupServiceMock.GetAllAsync().Returns(new List<GroupDto>
-                {GroupDto.GetGroupDtoWithId(1, "someName", "someCountry", 2000)});
-            var sut = new GroupsController(groupServiceMock);
-
             //Act
-            var response = await sut.GetGroupsByCountry("someCountry");
+            var response = await _sut.GetGroupsByCountry("someCountry");
 
             //Assert
-            await groupServiceMock.Received().FindOneAsync(g => g.Country == "someCountry");
-            //Assert.Equal(200, ((StatusCodeResult) response.Result).StatusCode);
+            //await groupServiceMock.Received().FindOneAsync(g => g.Country == "someCountry");
+            Assert.Equal(200, ((ObjectResult) response.Result).StatusCode);
             //Assert.Equal(expected, response.Value);
         }
 
@@ -189,33 +152,57 @@ namespace AppTests
         [InlineData("")]
         public async Task GetGroupsByCountry_NotSpecifiedNameStatusBadRequest(string name)
         {
-            //Arrange
-            var groupServiceMock = Substitute.For<IGroupService>();
-            var sut = new GroupsController(groupServiceMock);
 
             //Act
-            var response = await sut.GetGroupsByCountry(name);
+            var response = await _sut.GetGroupsByCountry(name);
 
             //Assert
-            Assert.Equal(400, ((StatusCodeResult) response.Result).StatusCode);
+            Assert.Equal(400, ((ObjectResult) response.Result).StatusCode);
         }
 
         [Fact]
         public async Task GetGroupsByCountry_NotExistingNameNameStatusBadRequest()
         {
-            //Arrange
-            var groupServiceMock = Substitute.For<IGroupService>();
-            var group = GroupDto.GetGroupDtoWithId(1, "someName", "someCountry", 2000);
-            groupServiceMock.GetAllAsync().Returns(new List<GroupDto> {group});
-            //groupServiceMock.FindOneAsync(g => g.Country == "notExistingName").Returns(null);
-            var sut = new GroupsController(groupServiceMock);
-
             //Act
-            var response = await sut.GetGroupsByCountry("notExistingName");
+            var response = await _sut.GetGroupsByCountry("notExistingName");
 
             //Assert
-            await groupServiceMock.Received().FindOneAsync(g => g.Name == "notExistingName");
-            //Assert.Equal(400, ((StatusCodeResult) response.Result).StatusCode);
+            //await groupServiceMock.Received().FindOneAsync(g => g.Name == "notExistingName");
+            Assert.Equal(404, ((ObjectResult) response.Result).StatusCode);
         }
+
+        #region Misc
+
+        private void ConfigureSub()
+        {
+            _groupServiceMock.GetAllAsync().Returns(info => { return _expectedList; });
+            _groupServiceMock.FindOneAsync(Arg.Any<Predicate<GroupDto>>()).Returns(info =>
+            {
+                var predicate = (Predicate<GroupDto>)info.Args()[0];
+                return _expectedList.FirstOrDefault(dto => predicate(dto));
+            });
+            _groupServiceMock.FindAsync(Arg.Any<Predicate<GroupDto>>()).Returns(info =>
+            {
+                var predicate = (Predicate<GroupDto>)info.Args()[0];
+                return _expectedList.Where(dto => predicate(dto));
+            });
+
+            _groupServiceMock.DeleteByIdAsync(Arg.Any<int>()).Returns(info =>
+            {
+                var id = (int)info.Args()[0];
+
+                var groupDto = _expectedList.FirstOrDefault(dto => dto.Id == id);
+                if (groupDto != null)
+                {
+                    _expectedList.Remove(groupDto);
+                    return Task.CompletedTask;
+                }
+
+                throw new Exception("SHIT!");
+            });
+        }
+
+
+        #endregion
     }
 }

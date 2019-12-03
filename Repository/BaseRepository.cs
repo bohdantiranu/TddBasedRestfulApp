@@ -1,17 +1,15 @@
 ﻿using Core.Interfaces;
-using Core.Models;
-using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
 namespace Repository
 {
     public class BaseRepository<T> : IRepository<T> where T : class
     {
-        protected GroupsContext Context { get; }
+        protected DbContext Context { get; }
 
-        protected BaseRepository(GroupsContext context)
+        protected BaseRepository(DbContext context)
         {
             Context = context;
         }
